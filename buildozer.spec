@@ -6,9 +6,10 @@ source.dir = .
 source.include_exts = py,png,jpg,kv,atlas,json,so
 version = 1.0
 
-# Dependensi - urutan penting!
-# openssl & cryptography harus sebelum paramiko
-requirements = python3,kivy==2.3.0,kivymd==1.2.0,requests,openssl,cryptography,paramiko,websocket-client,plyer
+# Requirements MINIMAL dulu supaya build berhasil
+# paramiko & cryptography dihapus sementara (kompleks, sering gagal compile)
+# Bisa ditambah lagi setelah build pertama berhasil
+requirements = python3,kivy==2.3.0,kivymd==1.2.0,requests,websocket-client,plyer
 
 orientation = portrait
 fullscreen = 0
@@ -16,7 +17,7 @@ fullscreen = 0
 # Izin Android
 android.permissions = INTERNET,ACCESS_NETWORK_STATE
 
-# Android SDK
+# Android SDK - biarkan buildozer download sendiri (r25b)
 android.api = 33
 android.minapi = 26
 android.ndk = 25b
