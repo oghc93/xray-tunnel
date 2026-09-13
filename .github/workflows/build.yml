@@ -47,6 +47,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install cython==0.29.33
+          pip install python-for-android==2024.1.21
           pip install buildozer
 
       - name: Cache buildozer
@@ -55,7 +56,11 @@ jobs:
           path: |
             .buildozer
             ~/.buildozer
-          key: buildozer-${{ hashFiles('buildozer.spec') }}
+          key: buildozer-v2-${{ hashFiles('buildozer.spec') }}
+
+      - name: Pastikan pakai python-for-android yang di-pin
+        run: |
+          rm -rf .buildozer/android/platform/python-for-android
 
       - name: Build APK (native, Python 3.11)
         run: |
