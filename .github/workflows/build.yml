@@ -15,19 +15,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Download xray binary otomatis - tidak perlu upload ke GitHub
+      # Download xray binary otomatis
       - name: Download Xray binary (ARM64)
         run: |
-          echo "Mencari versi xray terbaru..."
           LATEST=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r .tag_name)
           echo "Xray versi: $LATEST"
           mkdir -p assets
-          curl -L -o /tmp/xray-android.zip \
-            "https://github.com/XTLS/Xray-core/releases/download/${LATEST}/Xray-android-arm64-v8a.zip"
-          unzip -o /tmp/xray-android.zip xray -d assets/
+          curl -L -o /tmp/xray.zip \
+            "{{https://github.com/XTLS/Xray-core/releases/download/${LATEST}}}/Xray-android-arm64-v8a.zip"
+          unzip -o /tmp/xray.zip xray -d assets/
           chmod +x assets/xray
           ls -lh assets/
-          echo "Xray binary siap!"
 
       - name: Cache buildozer
         uses: actions/cache@v4
@@ -35,12 +33,15 @@ jobs:
           path: .buildozer
           key: buildozer-${{ hashFiles('buildozer.spec') }}
 
-      # Pakai Docker Kivy - cara paling reliable untuk build APK Kivy
-      - name: Build APK dengan Docker Kivy
+      # PERBAIKAN UTAMA: Pakai tag 'stable' bukan 'latest'
+      # latest pakai Python 3.14 yang belum kompatibel dengan Cython
+      # stable pakai Python 3.11 yang sudah terbukti jalan
+      - name: Build APK dengan Docker Kivy (stable)
         run: |
+          docker pull kivy/buildozer:stable
           docker run --rm \
             -v "${{ github.workspace }}:/home/user/hostcwd" \
-            kivy/buildozer:latest \
+            kivy/buildozer:stable \
             android debug 2>&1 | tee build.log
 
       - name: Cek APK hasil build
@@ -50,8 +51,7 @@ jobs:
             ls -lh bin/*.apk
           else
             echo "APK tidak ditemukan!"
-            echo "=== 50 baris terakhir log ==="
-            tail -50 build.log
+            tail -80 build.log
             exit 1
           fi
 
@@ -62,7 +62,7 @@ jobs:
           path: bin/*.apk
           retention-days: 30
 
-      - name: Upload log build (untuk debug)
+      - name: Upload log build
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -87,4 +87,3 @@ jobs:
             3. Install & buka app!
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
