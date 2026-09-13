@@ -29,20 +29,38 @@ jobs:
           ls -lh assets/
           echo "Xray binary siap!"
 
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            git zip unzip openjdk-17-jdk python3-pip autoconf libtool \
+            pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev \
+            cmake libffi-dev libssl-dev automake build-essential \
+            ccache libltdl-dev
+
+      - name: Install buildozer & Cython (pinned)
+        run: |
+          pip install --upgrade pip
+          pip install cython==0.29.33
+          pip install buildozer
+
       - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: .buildozer
+          path: |
+            .buildozer
+            ~/.buildozer
           key: buildozer-${{ hashFiles('buildozer.spec') }}
 
-      # Pakai Docker Kivy - cara paling reliable untuk build APK Kivy
-      - name: Build APK dengan Docker Kivy
+      - name: Build APK (native, Python 3.11)
         run: |
           set -o pipefail
-          docker run --rm \
-            -v "${{ github.workspace }}:/home/user/hostcwd" \
-            kivy/buildozer:latest \
-            android debug 2>&1 | tee build.log
+          yes | buildozer -v android debug 2>&1 | tee build.log
 
       - name: Cek APK hasil build
         run: |
