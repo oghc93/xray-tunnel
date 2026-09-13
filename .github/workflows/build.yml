@@ -5,55 +5,15 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-# Fix error 403 - kasih izin write untuk buat Release
 permissions:
   contents: write
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      # Fix buildozer - install semua deps yang dibutuhkan
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            git zip unzip \
-            openjdk-17-jdk \
-            autoconf automake libtool \
-            pkg-config \
-            zlib1g-dev \
-            libncurses5-dev libncursesw5-dev libtinfo5 \
-            cmake \
-            libffi-dev \
-            libssl-dev \
-            curl wget \
-            jq \
-            build-essential \
-            ccache \
-            lld \
-            python3-dev \
-            python3-pip \
-            libltdl-dev \
-            aidl \
-            patchelf
-
-      - name: Set JAVA_HOME
-        run: |
-          echo "JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> $GITHUB_ENV
-          echo "PATH=/usr/lib/jvm/java-17-openjdk-amd64/bin:$PATH" >> $GITHUB_ENV
-          java -version
-
-      - name: Install Python build tools
-        run: |
-          pip install --upgrade pip
-          pip install buildozer cython==0.29.36 virtualenv
 
       # Download xray binary otomatis - tidak perlu upload ke GitHub
       - name: Download Xray binary (ARM64)
@@ -69,46 +29,40 @@ jobs:
           ls -lh assets/
           echo "Xray binary siap!"
 
-      - name: Cache Buildozer global dir
+      - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: ~/.buildozer
-          key: buildozer-${{ runner.os }}-${{ hashFiles('buildozer.spec') }}
-          restore-keys: |
-            buildozer-${{ runner.os }}-
+          path: .buildozer
+          key: buildozer-${{ hashFiles('buildozer.spec') }}
 
-      - name: Cache Android SDK & NDK
-        uses: actions/cache@v4
-        with:
-          path: ~/.android
-          key: android-sdk-${{ runner.os }}
-
-      - name: Build APK
+      # Pakai Docker Kivy - cara paling reliable untuk build APK Kivy
+      - name: Build APK dengan Docker Kivy
         run: |
-          buildozer -v android debug 2>&1 | tee build.log
-          echo "Exit code: $?"
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+          docker run --rm \
+            -v "${{ github.workspace }}:/home/user/hostcwd" \
+            kivy/buildozer:latest \
+            android debug 2>&1 | tee build.log
 
-      - name: Cek hasil build
+      - name: Cek APK hasil build
         run: |
           if ls bin/*.apk 2>/dev/null; then
-            echo "APK berhasil dibuat!"
+            echo "BUILD BERHASIL!"
             ls -lh bin/*.apk
           else
-            echo "APK tidak ditemukan. Tampilkan log terakhir:"
-            tail -100 build.log
+            echo "APK tidak ditemukan!"
+            echo "=== 50 baris terakhir log ==="
+            tail -50 build.log
             exit 1
           fi
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: vpn-client-apk
           path: bin/*.apk
           retention-days: 30
 
-      - name: Upload build log (untuk debug jika gagal)
+      - name: Upload log build (untuk debug)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -116,7 +70,7 @@ jobs:
           path: build.log
           retention-days: 7
 
-      - name: Create GitHub Release
+      - name: Buat GitHub Release
         if: success()
         uses: softprops/action-gh-release@v2
         with:
@@ -124,14 +78,13 @@ jobs:
           name: "VPN Client Build #${{ github.run_number }}"
           files: bin/*.apk
           body: |
-            ## 📱 VPN Client APK
+            ## ðŸ“± VPN Client APK
+            Build dari commit: `${{ github.sha }}`
 
-            Build otomatis dari commit: `${{ github.sha }}`
-
-            ### Cara Install:
-            1. Download file `.apk` di bawah
-            2. Aktifkan **Izinkan instalasi dari sumber tidak dikenal**
-            3. Install APK
-            4. Buka app → tambah profil → konek!
+            **Cara install:**
+            1. Download APK di bawah
+            2. Aktifkan instalasi dari sumber tidak dikenal
+            3. Install & buka app!
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
