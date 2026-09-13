@@ -15,30 +15,48 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
       - name: Download Xray binary (ARM64)
         run: |
           LATEST=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r .tag_name)
           echo "Xray versi: $LATEST"
           mkdir -p assets
-          curl -L -o /tmp/xray.zip \
-            "https://github.com/XTLS/Xray-core/releases/download/${LATEST}/Xray-android-arm64-v8a.zip"
+          curl -L -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${LATEST}/Xray-android-arm64-v8a.zip"
           unzip -o /tmp/xray.zip xray -d assets/
           chmod +x assets/xray
           ls -lh assets/
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            git zip unzip wget openjdk-17-jdk \
+            build-essential python3-dev \
+            autoconf automake libtool pkg-config \
+            zlib1g-dev libssl-dev libffi-dev libltdl-dev \
+            cmake ccache lld patchelf libc6-i386 lib32stdc++6
+
+      - name: Install Python dependencies
+        run: |
+          pip install --upgrade pip
+          pip install "cython==0.29.36"
+          pip install "buildozer==1.5.0"
+
       - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: .buildozer
+          path: ~/.buildozer
           key: buildozer-${{ hashFiles('buildozer.spec') }}
+          restore-keys: buildozer-
 
-      - name: Build APK dengan Docker Kivy (stable)
+      - name: Build APK
+        env:
+          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
         run: |
-          docker pull kivy/buildozer:stable
-          docker run --rm \
-            -v "${{ github.workspace }}:/home/user/hostcwd" \
-            kivy/buildozer:stable \
-            android debug 2>&1 | tee build.log
+          buildozer -v android debug 2>&1 | tee build.log
 
       - name: Cek APK hasil build
         run: |
@@ -47,7 +65,7 @@ jobs:
             ls -lh bin/*.apk
           else
             echo "APK tidak ditemukan!"
-            tail -80 build.log
+            tail -100 build.log
             exit 1
           fi
 
@@ -75,11 +93,6 @@ jobs:
           files: bin/*.apk
           body: |
             ## VPN Client APK
-            Build dari commit: `${{ github.sha }}`
-
-            Cara install:
-            1. Download APK di bawah
-            2. Aktifkan instalasi dari sumber tidak dikenal
-            3. Install & buka app!
+            Build: `${{ github.sha }}`
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
