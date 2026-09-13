@@ -15,48 +15,34 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
+      # Download xray binary otomatis - tidak perlu upload ke GitHub
       - name: Download Xray binary (ARM64)
         run: |
+          echo "Mencari versi xray terbaru..."
           LATEST=$(curl -s https://api.github.com/repos/XTLS/Xray-core/releases/latest | jq -r .tag_name)
           echo "Xray versi: $LATEST"
           mkdir -p assets
-          curl -L -o /tmp/xray.zip "https://github.com/XTLS/Xray-core/releases/download/${LATEST}/Xray-android-arm64-v8a.zip"
-          unzip -o /tmp/xray.zip xray -d assets/
+          curl -L -o /tmp/xray-android.zip \
+            "https://github.com/XTLS/Xray-core/releases/download/${LATEST}/Xray-android-arm64-v8a.zip"
+          unzip -o /tmp/xray-android.zip xray -d assets/
           chmod +x assets/xray
           ls -lh assets/
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y \
-            git zip unzip wget openjdk-17-jdk \
-            build-essential python3-dev \
-            autoconf automake libtool pkg-config \
-            zlib1g-dev libssl-dev libffi-dev libltdl-dev \
-            cmake ccache lld patchelf libc6-i386 lib32stdc++6
-
-      - name: Install Python dependencies
-        run: |
-          pip install --upgrade pip
-          pip install "cython==0.29.36"
-          pip install "buildozer==1.5.0"
+          echo "Xray binary siap!"
 
       - name: Cache buildozer
         uses: actions/cache@v4
         with:
-          path: ~/.buildozer
+          path: .buildozer
           key: buildozer-${{ hashFiles('buildozer.spec') }}
-          restore-keys: buildozer-
 
-      - name: Build APK
-        env:
-          JAVA_HOME: /usr/lib/jvm/java-17-openjdk-amd64
+      # Pakai Docker Kivy - cara paling reliable untuk build APK Kivy
+      - name: Build APK dengan Docker Kivy
         run: |
-          buildozer -v android debug 2>&1 | tee build.log
+          set -o pipefail
+          docker run --rm \
+            -v "${{ github.workspace }}:/home/user/hostcwd" \
+            kivy/buildozer:latest \
+            android debug 2>&1 | tee build.log
 
       - name: Cek APK hasil build
         run: |
@@ -65,7 +51,8 @@ jobs:
             ls -lh bin/*.apk
           else
             echo "APK tidak ditemukan!"
-            tail -100 build.log
+            echo "=== 50 baris terakhir log ==="
+            tail -50 build.log
             exit 1
           fi
 
@@ -76,7 +63,7 @@ jobs:
           path: bin/*.apk
           retention-days: 30
 
-      - name: Upload log build
+      - name: Upload log build (untuk debug)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -92,7 +79,12 @@ jobs:
           name: "VPN Client Build #${{ github.run_number }}"
           files: bin/*.apk
           body: |
-            ## VPN Client APK
-            Build: `${{ github.sha }}`
+            ## 📱 VPN Client APK
+            Build dari commit: `${{ github.sha }}`
+
+            **Cara install:**
+            1. Download APK di bawah
+            2. Aktifkan instalasi dari sumber tidak dikenal
+            3. Install & buka app!
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
