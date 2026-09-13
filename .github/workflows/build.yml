@@ -76,7 +76,15 @@ jobs:
           set -o pipefail
           echo "JAVA_HOME aktif: $JAVA_HOME"
           java -version
-          yes | buildozer -v android debug 2>&1 | tee build.log
+          # 'yes' dipakai untuk auto-jawab prompt buildozer. Setelah buildozer
+          # selesai (walau SUKSES), 'yes' masih menulis ke pipe yang sudah
+          # tertutup -> dia exit dengan error "Broken pipe". Tanpa penanganan
+          # khusus, pipefail membuat exit code SIGPIPE milik 'yes' itu dibaca
+          # sebagai kegagalan step ini, padahal buildozer-nya sendiri berhasil.
+          # Redam pesan errornya, lalu ambil exit code buildozer secara
+          # spesifik (indeks ke-1 di PIPESTATUS) sebagai penentu sukses/gagal.
+          yes 2>/dev/null | buildozer -v android debug 2>&1 | tee build.log
+          exit ${PIPESTATUS[1]}
 
       - name: Cek APK hasil build
         run: |
