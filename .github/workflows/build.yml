@@ -78,12 +78,14 @@ jobs:
           java -version
           # 'yes' dipakai untuk auto-jawab prompt buildozer. Setelah buildozer
           # selesai (walau SUKSES), 'yes' masih menulis ke pipe yang sudah
-          # tertutup -> dia exit dengan error "Broken pipe". Tanpa penanganan
-          # khusus, pipefail membuat exit code SIGPIPE milik 'yes' itu dibaca
-          # sebagai kegagalan step ini, padahal buildozer-nya sendiri berhasil.
-          # Redam pesan errornya, lalu ambil exit code buildozer secara
-          # spesifik (indeks ke-1 di PIPESTATUS) sebagai penentu sukses/gagal.
-          yes 2>/dev/null | buildozer -v android debug 2>&1 | tee build.log
+          # tertutup -> dia exit dengan error "Broken pipe". GitHub Actions
+          # menjalankan step ini dengan `bash -e`, jadi tanpa `|| true`, bash
+          # akan langsung berhenti di baris pipeline ini (karena exit code
+          # SIGPIPE milik 'yes' dianggap gagal) SEBELUM sempat menjalankan
+          # baris `exit ${PIPESTATUS[1]}` di bawahnya. `|| true` mencegah itu,
+          # sehingga exit code buildozer yang sebenarnya (indeks ke-1 di
+          # PIPESTATUS) yang menentukan sukses/gagalnya step ini.
+          yes 2>/dev/null | buildozer -v android debug 2>&1 | tee build.log || true
           exit ${PIPESTATUS[1]}
 
       - name: Cek APK hasil build
