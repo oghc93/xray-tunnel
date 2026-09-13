@@ -8,7 +8,10 @@ version = 1.0
 
 # Dependensi - urutan penting!
 # openssl & cryptography harus sebelum paramiko
-requirements = python3,cython==0.29.33,kivy==2.3.0,kivymd==1.2.0,requests,openssl,cryptography,paramiko,websocket-client,plyer
+# python3 & cython dikunci versinya: modul stdlib 'cgi' yang dipakai Cython<3.0 (via Tempita)
+# sudah dihapus di Python 3.13+, dan p4a bisa membangun hostpython versi sangat baru
+# (3.13/3.14) yang tidak lagi punya modul itu -> build gagal dengan ModuleNotFoundError: cgi
+requirements = python3==3.11.9,cython==0.29.37,kivy==2.3.0,kivymd==1.2.0,requests,openssl,cryptography,paramiko,websocket-client,plyer
 
 orientation = portrait
 fullscreen = 0
