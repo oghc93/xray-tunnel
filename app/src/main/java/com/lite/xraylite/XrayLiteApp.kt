@@ -1,87 +1,94 @@
-package com.lite.xraylite
+package com.lite.xraylite.config
 
-import android.app.Application
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.os.Build
-import androidx.appcompat.app.AppCompatDelegate
-import com.lite.xraylite.config.ServerRepository
-import com.lite.xraylite.settings.Prefs
-import com.lite.xraylite.util.Logger
+import android.content.Context
+import android.content.SharedPreferences
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import com.lite.xraylite.model.ServerConfig
 
-/**
- * go.Seq.setContext(...) WAJIB dipanggil sekali sebelum method Libv2ray/CoreController
- * apapun dipanggil — ini syarat runtime dari binding gomobile (gobind), bukan langkah
- * opsional. Paling aman dipanggil sedini mungkin di Application.onCreate(), bukan di
- * XrayVpnService (yang bisa saja belum tentu jadi komponen pertama yang start).
- *
- * Libv2ray.initCoreEnv(assetPath, xudpBaseKey) menyiapkan path asset/cert Xray-core.
- * xudpBaseKey dikosongkan karena app ini tidak pakai fitur XUDP encryption khusus.
- */
-class XrayLiteApp : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        Prefs.init(this)
-        ServerRepository.init(this)
-        applyThemePref()
+object ServerRepository {
 
-        go.Seq.setContext(applicationContext)
-        libv2ray.Libv2ray.initCoreEnv(filesDir.absolutePath, "")
+    private const val FILE = "og_tunnel_servers"
+    private const val KEY_SERVERS = "servers_json"
+    private const val KEY_ACTIVE = "active_id"
+    private const val KEY_SCHEMA_VERSION = "schema_version"
+    private const val CURRENT_SCHEMA_VERSION = 2
 
-        logStartupInfo()
-        setupNetworkLogIfEnabled()
+    private lateinit var sp: SharedPreferences
+    private val gson = Gson()
+    private val servers = LinkedHashMap<String, ServerConfig>()
+
+    var activeId: String? = null
+        private set
+
+    fun init(context: Context) {
+        if (::sp.isInitialized) return
+        sp = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
+        loadFromDisk()
     }
 
-    /** Settings > General > "Network log": catat network up/down (tipe: WIFI/MOBILE) ke Logger. */
-    private fun setupNetworkLogIfEnabled() {
-        if (!Prefs.networkLogEnabled) return
-        val cm = getSystemService(ConnectivityManager::class.java) ?: return
-        cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                val caps = cm.getNetworkCapabilities(network)
-                val type = when {
-                    caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true -> "WIFI"
-                    caps?.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) == true -> "MOBILE"
-                    else -> "UNKNOWN"
-                }
-                Logger.log("Network up ($type)")
+    private fun loadFromDisk() {
+        val savedVersion = sp.getInt(KEY_SCHEMA_VERSION, 1)
+        if (savedVersion < CURRENT_SCHEMA_VERSION) {
+            sp.edit().remove(KEY_SERVERS).remove(KEY_ACTIVE).putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION).apply()
+            return
+        }
+        val json = sp.getString(KEY_SERVERS, null)
+        if (!json.isNullOrBlank()) {
+            runCatching {
+                val type = object : TypeToken<List<ServerConfig>>() {}.type
+                val list: List<ServerConfig> = gson.fromJson(json, type)
+                list.forEach { servers[it.id] = it }
             }
-
-            override fun onLost(network: Network) {
-                Logger.log("Network lost")
-            }
-        })
+        }
+        activeId = sp.getString(KEY_ACTIVE, null)
     }
 
-    private fun applyThemePref() {
-        AppCompatDelegate.setDefaultNightMode(
-            when (Prefs.theme) {
-                "light" -> AppCompatDelegate.MODE_NIGHT_NO
-                "system" -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
-                else -> AppCompatDelegate.MODE_NIGHT_YES // "dark"
-            }
-        )
+    private fun persist() {
+        sp.edit()
+            .putString(KEY_SERVERS, gson.toJson(servers.values.toList()))
+            .putString(KEY_ACTIVE, activeId)
+            .putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION)
+            .apply()
     }
 
-    /** Meniru baris log NetMod: versi app, versi core Xray, info device — muncul di "Show logs". */
-    private fun logStartupInfo() {
-        val versionName = BuildConfig.VERSION_NAME
-        val versionCode = BuildConfig.VERSION_CODE
-        Logger.log("App version $versionName build $versionCode")
+    object SessionStats {
+        var uploadBytes: Long = 0L
+        var downloadBytes: Long = 0L
+        var connectedSinceMs: Long = 0L
 
-        // checkVersionX() dari AndroidLibXrayLite mengembalikan string versi
-        // libv2ray-binding + versi Xray-core sekaligus (dicek ke source resminya,
-        // fungsi Go: `func CheckVersionX() string`). Formatnya bebas ditentukan upstream,
-        // jadi ditampilkan apa adanya, tidak diparse manual.
-        runCatching { libv2ray.Libv2ray.checkVersionX() }
-            .onSuccess { Logger.log("Xray/Core: $it") }
-            .onFailure { Logger.error("Gagal ambil versi core: ${it.message}") }
-
-        Logger.log(
-            "Running on ${Build.MANUFACTURER} ${Build.MODEL} (${Build.DEVICE}); " +
-                "Android: ${Build.VERSION.RELEASE} (${Build.VERSION.SDK_INT}); " +
-                "ABIs: ${Build.SUPPORTED_ABIS.joinToString(", ")}"
-        )
+        fun reset() {
+            uploadBytes = 0L
+            downloadBytes = 0L
+            connectedSinceMs = System.currentTimeMillis()
+        }
     }
+
+    private val pingResults = HashMap<String, Int?>()
+
+    fun setPing(id: String, ms: Int?) { pingResults[id] = ms }
+    fun getPing(id: String): Int? = pingResults[id]
+
+    fun add(cfg: ServerConfig) {
+        servers[cfg.id] = cfg
+        persist()
+    }
+
+    fun remove(id: String) {
+        servers.remove(id)
+        pingResults.remove(id)
+        if (activeId == id) activeId = null
+        persist()
+    }
+
+    fun all(): List<ServerConfig> = servers.values.toList()
+
+    fun get(id: String?): ServerConfig? = id?.let { servers[it] }
+
+    fun setActive(id: String) {
+        activeId = id
+        persist()
+    }
+
+    fun activeConfig(): ServerConfig? = get(activeId)
 }
