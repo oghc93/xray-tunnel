@@ -6,21 +6,13 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.lite.xraylite.model.ServerConfig
 
-/**
- * Penyimpanan daftar semua profil server (multi-profile), plus profil aktif
- * dan statistik sesi berjalan (dipakai panel monitor di UI).
- *
- * Sekarang PERSISTEN lewat SharedPreferences (Gson serialize List<ServerConfig>) —
- * sebelumnya ini murni in-memory, jadi seluruh server hilang tiap app di-kill/restart.
- * Ini diperbaiki karena fitur "Import from file" tidak banyak gunanya kalau hasil
- * import-nya hilang begitu app ditutup. Panggil [init] sekali di Application.onCreate()
- * sebelum method lain di object ini dipakai.
- */
 object ServerRepository {
 
     private const val FILE = "og_tunnel_servers"
     private const val KEY_SERVERS = "servers_json"
     private const val KEY_ACTIVE = "active_id"
+    private const val KEY_SCHEMA_VERSION = "schema_version"
+    private const val CURRENT_SCHEMA_VERSION = 2
 
     private lateinit var sp: SharedPreferences
     private val gson = Gson()
@@ -36,6 +28,11 @@ object ServerRepository {
     }
 
     private fun loadFromDisk() {
+        val savedVersion = sp.getInt(KEY_SCHEMA_VERSION, 1)
+        if (savedVersion < CURRENT_SCHEMA_VERSION) {
+            sp.edit().remove(KEY_SERVERS).remove(KEY_ACTIVE).putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION).apply()
+            return
+        }
         val json = sp.getString(KEY_SERVERS, null)
         if (!json.isNullOrBlank()) {
             runCatching {
@@ -51,12 +48,10 @@ object ServerRepository {
         sp.edit()
             .putString(KEY_SERVERS, gson.toJson(servers.values.toList()))
             .putString(KEY_ACTIVE, activeId)
+            .putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION)
             .apply()
     }
 
-    // Statistik sesi berjalan (byte). Diupdate dari XrayVpnService / SshTunnelManager
-    // lewat SessionStats saat data mengalir. Placeholder sampai dihubungkan ke
-    // API stats asli Xray-core (StatsManager) atau counter socket SSH.
     object SessionStats {
         var uploadBytes: Long = 0L
         var downloadBytes: Long = 0L
@@ -69,7 +64,6 @@ object ServerRepository {
         }
     }
 
-    // Hasil ping terakhir tiap server (ms), null = belum pernah dites, -1 = timeout
     private val pingResults = HashMap<String, Int?>()
 
     fun setPing(id: String, ms: Int?) { pingResults[id] = ms }
