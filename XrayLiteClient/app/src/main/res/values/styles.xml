@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="TaglineText">
+        <item name="android:textColor">@color/og_text_dim</item>
+        <item name="android:textSize">9.5sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.1</item>
+    </style>
+
+    <style name="TaglineTextEnd" parent="TaglineText">
+        <item name="android:textStyle">normal|italic</item>
+        <item name="android:textColor">@color/og_text</item>
+    </style>
+</resources>

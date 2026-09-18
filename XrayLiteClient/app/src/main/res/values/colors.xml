@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Palet OG Tunnel: emas di atas hitam, senada logo aplikasi. Sebelumnya file ini
+         tidak ada sama sekali sehingga seluruh app diam-diam memakai warna default
+         Material Components (ungu #6200EE); itu penyebab tampilan kelihatan "generic". -->
+    <color name="og_gold">#D9A93A</color>
+    <color name="og_gold_dark">#A9761A</color>
+    <color name="og_gold_light">#E9C869</color>
+    <color name="og_bg">#0C0C0D</color>
+    <color name="og_surface">#141416</color>
+    <color name="og_surface_2">#1C1C1F</color>
+    <color name="og_text">#ECEAE6</color>
+    <color name="og_text_dim">#8D8B86</color>
+    <color name="og_green">#4CAF50</color>
+    <color name="og_red">#FF5252</color>
+
+    <color name="colorPrimary">@color/og_gold</color>
+    <color name="colorPrimaryDark">@color/og_gold_dark</color>
+    <color name="colorAccent">@color/og_gold_light</color>
+    <color name="colorSecondary">@color/og_gold</color>
+</resources>
