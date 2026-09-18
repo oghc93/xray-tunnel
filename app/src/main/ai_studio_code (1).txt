@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    package="com.lite.xraylite">
+
+    <!-- Izin Akses Jaringan & Internet -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+
+    <!-- Izin Service Latar Belakang (Android 9+) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    
+    <!-- Izin Khusus Android 14+ (API 34) untuk Service VPN / Jaringan -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" tools:ignore="ProtectedPermissions" />
+
+    <!-- Izin Notifikasi (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Izin Getar & Boot -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:name=".XrayLiteApp"
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.XrayLite"
+        android:networkSecurityConfig="@xml/network_security_config"
+        tools:targetApi="34">
+
+        <!-- 
+          PERBAIKAN UTAMA DI SINI:
+          Sebelumnya tertulis: android:name=".MainActivity" (salah, menyebabkan crash saat dibuka).
+          Diperbaiki menjadi: android:name=".ui.MainActivity" karena file berada di subfolder ui.
+        -->
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|smallestScreenSize|uiMode"
+            android:launchMode="singleTask"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Activity Log Console -->
+        <activity
+            android:name=".ui.LogActivity"
+            android:exported="false"
+            android:label="Connection Logs"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Activity Pengaturan -->
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:label="Settings"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Activity Network Tools (Ping & Geo IP) -->
+        <activity
+            android:name=".ui.NetworkToolsActivity"
+            android:exported="false"
+            android:label="Network Tools"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Activity Tentang Aplikasi -->
+        <activity
+            android:name=".ui.AboutActivity"
+            android:exported="false"
+            android:label="About XrayLite"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <!-- Service Inti VPN -->
+        <service
+            android:name=".vpn.XrayVpnService"
+            android:permission="android.permission.BIND_VPN_SERVICE"
+            android:exported="false"
+            android:foregroundServiceType="systemExempted">
+            <intent-filter>
+                <action android:name="android.net.VpnService" />
+            </intent-filter>
+        </service>
+
+    </application>
+
+</manifest>
